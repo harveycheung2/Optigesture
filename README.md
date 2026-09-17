@@ -1,4 +1,4 @@
-# 🖐️ OptiGesture — Next-Gen AI Spatial Air Gesture Mouse
+# OptiGesture - Next-Gen AI Spatial Air Gesture Mouse
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -6,39 +6,39 @@
 [![MediaPipe 1.0+](https://img.shields.io/badge/MediaPipe-Task%20Vision-orange.svg)](https://developers.google.com/mediapipe)
 [![Tests: 24 Passed](https://img.shields.io/badge/tests-24%2F24%20passed-brightgreen.svg)]()
 
-**OptiGesture** turns any standard laptop or desktop webcam into a high-precision, low-latency spatial mouse controller for Windows 10 & 11. Built entirely on on-device machine vision and deterministic signal processing, OptiGesture enables seamless pointer control, zero-drift pinch clicks, hold-to-drag, Tab-style magnetic snapping to Windows buttons, flick scrolling with return-stroke suppression, and a continuous 5-second back-of-hand pause clutch.
+OptiGesture turns any standard laptop or desktop webcam into a high-precision, low-latency spatial mouse controller for Windows 10 and 11. Built entirely on on-device machine vision and deterministic signal processing, OptiGesture enables seamless pointer control, zero-drift pinch clicks, hold-to-drag, Tab-style magnetic snapping to Windows buttons, flick scrolling with return-stroke suppression, and a continuous 5-second back-of-hand pause clutch.
 
-**100% Offline & Private:** Zero video frames or telemetry ever leave your device.
+100% Offline and Private: Zero video frames or telemetry ever leave your device.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-- **👆 Fluid Pointer Tracking & Non-Linear Ballistics**:
-  - Gold-standard **$1€$ Filter** eliminates physiological hand tremors when aiming at small targets.
-  - **Dynamic Pointer Ballistics** dynamically scales cursor velocity: slow movements offer 1:1 pixel precision, while swift motions span dual-monitor or 3K/4K setups with ease.
-- **🤏 Zero-Drift Pinch Click & Hold-to-Drag**:
+- **Fluid Pointer Tracking and Non-Linear Ballistics**:
+  - Gold-standard 1 Euro Filter eliminates physiological hand tremors when aiming at small targets.
+  - Dynamic Pointer Ballistics dynamically scales cursor velocity: slow movements offer 1:1 pixel precision, while swift motions span dual-monitor or 3K/4K setups with ease.
+- **Zero-Drift Pinch Click and Hold-to-Drag**:
   - Pointer coordinates lock the millisecond a pinch touches, eliminating cursor drift during clicks.
-  - Quick pinch triggers a left click; holding the pinch for $> 0.35\text{s}$ engages hold-and-drag.
-- **👊 Fist Scroll with Kinematic Recoil Suppression**:
+  - Quick pinch triggers a left click; holding the pinch for > 0.35s engages hold-and-drag.
+- **Fist Scroll with Kinematic Recoil Suppression**:
   - Curl all four fingers with knuckles facing the webcam to enter scrolling mode.
-  - Flick your wrist/fist **UP** to scroll up; flick **DOWN** to scroll down.
-  - Integrated **450ms refractory state machine** suppresses the natural return stroke back to neutral position, guaranteeing **strictly 1 scroll action per flick**.
-- **🧲 Tab-Style Smart Magnetic Snapping**:
+  - Flick your wrist/fist UP to scroll up; flick DOWN to scroll down.
+  - Integrated 450ms refractory state machine suppresses the natural return stroke back to neutral position, guaranteeing strictly 1 scroll action per flick.
+- **Tab-Style Smart Magnetic Snapping**:
   - Interrogates the Windows UI Automation tree asynchronously in the background.
   - Magnetically pulls the pointer toward clickable buttons, tabs, and checkboxes when in proximity, highlighting targeted controls with an on-screen glowing focus ring.
-- **✋ 5-Second Back-of-Hand Pause Clutch**:
+- **5-Second Back-of-Hand Pause Clutch**:
   - Uses 2D cross-product vector geometry to calculate palm normal orientation.
   - Continuous 5.0-second countdown with visual progress bar prevents accidental pause triggers.
-  - **Button-Only Unpause**: Once paused, hand gestures cannot accidentally resume tracking; unpausing is strictly locked to the keyboard (`[P]` or `[Space]`).
-- **🎯 Interactive 2-Step Calibration Wizard**:
-  - Runs automatically on startup (or via `[K]` key) to personalize resting hand scale and pinch thresholds to your hand size and distance from the camera.
-- **🖥️ Cyberpunk HUD Overlay & Screen Radar Minimap**:
+  - Button-Only Unpause: Once paused, hand gestures cannot accidentally resume tracking; unpausing is strictly locked to the keyboard ([P] or [Space]).
+- **Interactive 2-Step Calibration Wizard**:
+  - Runs automatically on startup (or via [K] key) to personalize resting hand scale and pinch thresholds to your hand size and distance from the camera.
+- **Cyberpunk HUD Overlay and Screen Radar Minimap**:
   - Displays real-time reticles, dynamic pinch gauges, mode badges, FPS meters, and a screen radar preview showing cursor coordinates and focused buttons.
 
 ---
 
-## 🏗️ Architecture & Module Breakdown
+## Architecture & Module Breakdown
 
 Every component in OptiGesture is modular, strictly typed, and optimized for performance:
 
@@ -75,7 +75,7 @@ Every component in OptiGesture is modular, strictly typed, and optimized for per
                               └────────────────────────┘
 ```
 
-### 📂 Program Files & Modules
+### Program Files & Modules
 
 | Module / Program | Path | Responsibility |
 | :--- | :--- | :--- |
@@ -93,7 +93,7 @@ Every component in OptiGesture is modular, strictly typed, and optimized for per
 
 ---
 
-## 📦 Technologies & Dependencies
+## Technologies & Dependencies
 
 OptiGesture relies on modern, industry-standard computer vision and Windows system libraries:
 
@@ -108,12 +108,12 @@ OptiGesture relies on modern, industry-standard computer vision and Windows syst
    - Zero-latency kernel-level mouse event generation and per-monitor DPI awareness.
 5. **Windows UIAutomation (`uiautomation >= 2.0.18`)**:
    - Interacts with Microsoft UIAutomationCore COM server to discover interactive GUI elements across Win32, WPF, UWP, and Electron desktop applications.
-6. **1€ Filter (Casiez, Roussel, Vogel - ACM CHI 2012)**:
+6. **1 Euro Filter (Casiez, Roussel, Vogel - ACM CHI 2012)**:
    - Adaptive first-order low-pass filter specifically designed for human-computer interaction to eliminate jitter at low speeds and latency at high speeds.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Windows 10 or Windows 11 (64-bit)
@@ -146,18 +146,18 @@ OptiGesture relies on modern, industry-standard computer vision and Windows syst
 
 ---
 
-## 🎮 Gesture Guide & Controls
+## Gesture Guide & Controls
 
 | Gesture | Hand Posture | Action |
 | :--- | :--- | :--- |
-| **Move Cursor** | Point Index finger inside active zone | Moves Windows mouse cursor with 1€ smoothing & ballistics |
-| **Left Click** | Quick pinch: Thumb + Index tip ($< 0.35\text{s}$) | Instant left click with zero-drift coordinate anchor |
-| **Drag & Drop** | Hold pinch: Thumb + Index tip ($> 0.35\text{s}$) | Locks left button down; release pinch to drop |
-| **Scroll UP** | Closed fist $\rightarrow$ Flick knuckles UP | Exactly 1 scroll up impulse; return recoil is suppressed |
-| **Scroll DOWN** | Closed fist $\rightarrow$ Flick knuckles DOWN | Exactly 1 scroll down impulse; return recoil is suppressed |
-| **Tab Smart Focus** | Hover near buttons / tabs / links | Magnetically snaps to button center + displays focus ring |
-| **Pause Tracking** | Show Back of Hand steadily for **5.0s** | Freezes cursor with countdown bar; rest arm without moving cursor |
-| **Resume Tracking** | Press `[P]` or `[Space]` on keyboard | **Button ONLY** resume prevents accidental gesture wake-up |
+| **Move Cursor** | Point Index finger inside active zone | Moves Windows mouse cursor with 1 Euro smoothing and ballistics |
+| **Left Click** | Quick pinch: Thumb + Index tip (< 0.35s) | Instant left click with zero-drift coordinate anchor |
+| **Drag & Drop** | Hold pinch: Thumb + Index tip (> 0.35s) | Locks left button down; release pinch to drop |
+| **Scroll UP** | Closed fist -> Flick knuckles UP | Exactly 1 scroll up impulse; return recoil is suppressed |
+| **Scroll DOWN** | Closed fist -> Flick knuckles DOWN | Exactly 1 scroll down impulse; return recoil is suppressed |
+| **Tab Smart Focus** | Hover near buttons / tabs / links | Magnetically snaps to button center and displays focus ring |
+| **Pause Tracking** | Show Back of Hand steadily for 5.0s | Freezes cursor with countdown bar; rest arm without moving cursor |
+| **Resume Tracking** | Press [P] or [Space] on keyboard | Button ONLY resume prevents accidental gesture wake-up |
 
 ### Keyboard Shortcuts
 
@@ -172,7 +172,7 @@ OptiGesture relies on modern, industry-standard computer vision and Windows syst
 
 ---
 
-## 🧪 Automated Testing
+## Automated Testing
 
 OptiGesture includes comprehensive automated test coverage:
 
@@ -185,18 +185,18 @@ python -m unittest discover -s tests
 Ran 24 tests in 2.37s
 OK (100% Pass Rate)
 ```
-- ✅ Mathematical rotation-invariance of finger extension
-- ✅ Zero-drift coordinate anchor locking
-- ✅ Adaptive palm-scale distance normalization
-- ✅ Flick UP & Flick DOWN discrete step calculation
-- ✅ Opposite-direction return stroke recoil suppression
-- ✅ 5.0-second continuous back-of-hand hold latching
-- ✅ Early hand withdrawal timer cancellation
-- ✅ Button-only unpause lockout
+- [Passed] Mathematical rotation-invariance of finger extension
+- [Passed] Zero-drift coordinate anchor locking
+- [Passed] Adaptive palm-scale distance normalization
+- [Passed] Flick UP and Flick DOWN discrete step calculation
+- [Passed] Opposite-direction return stroke recoil suppression
+- [Passed] 5.0-second continuous back-of-hand hold latching
+- [Passed] Early hand withdrawal timer cancellation
+- [Passed] Button-only unpause lockout
 
 ---
 
-## ⚙️ Configuration (`config.py`)
+## Configuration (`config.py`)
 
 Fine-tune any parameter in `config.py`:
 
@@ -205,7 +205,7 @@ Fine-tune any parameter in `config.py`:
 MARGIN_X = 0.20                      # Inner active horizontal boundary
 MARGIN_Y = 0.20                      # Inner active vertical boundary
 
-# 1€ Filter & Motion Smoothing
+# 1 Euro Filter & Motion Smoothing
 USE_ONE_EURO_FILTER = True
 ONE_EURO_MIN_CUTOFF = 1.15           # Lower = rock-steady hovering
 ONE_EURO_BETA = 0.045                # Higher = zero-lag fast swipes
@@ -222,7 +222,7 @@ BACK_OF_HAND_PAUSE_SEC = 5.0         # Continuous hold seconds required to pause
 
 ---
 
-## 🔒 Privacy Guarantee
+## Privacy Guarantee
 
 - **Zero Cloud Communication**: The computer vision model runs on your local CPU via TensorFlow Lite (`hand_landmarker.task`).
 - **No Video Recording or Storage**: Frames captured from the webcam exist exclusively in ephemeral RAM during processing and are discarded immediately.
@@ -230,6 +230,6 @@ BACK_OF_HAND_PAUSE_SEC = 5.0         # Continuous hold seconds required to pause
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License**. Feel free to use, modify, and distribute for personal and commercial projects.
