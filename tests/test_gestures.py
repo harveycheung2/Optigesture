@@ -11,6 +11,7 @@ class TestGestureDetector(unittest.TestCase):
             drag_hold_delay=0.2,
             click_cooldown=0.1,
             back_hold_sec=0.2,
+            v_sign_hold_sec=0.2,
         )
 
     def _mock_landmarks(self, thumb_pos=(0.4, 0.4), index_pos=(0.45, 0.45), middle_pos=(0.7, 0.7)):
@@ -87,66 +88,6 @@ class TestGestureDetector(unittest.TestCase):
         self.assertFalse(self.detector.manual_paused)
         self.assertEqual(self.detector.back_start_time, 0.0)
 
-    def test_fist_scroll_flick_up_and_down(self):
-        landmarks = self._mock_landmarks()
-        fist_fingers = {"thumb": False, "index": False, "middle": False, "ring": False, "pinky": False}
-
-        # Step 1: Initial fist detection (anchors previous knuckle y)
-        mode, info = self.detector.detect(landmarks, fist_fingers)
-        self.assertEqual(mode, GestureMode.SCROLLING)
-        self.assertTrue(info["is_fist"])
-        self.assertEqual(info["scroll_delta"], 0)
-
-        # Step 2: Flick UP (knuckles move upwards towards y=0.0, ny decreases)
-        for lm_idx in [5, 9, 13, 17]:
-            landmarks[lm_idx]["ny"] -= 0.035
-        mode, info = self.detector.detect(landmarks, fist_fingers)
-        self.assertEqual(mode, GestureMode.SCROLLING)
-        self.assertGreater(info["scroll_delta"], 0, "Flicking UP must produce positive scroll delta (Scroll UP)")
-        self.assertEqual(info["scroll_direction"], "UP")
-
-        # Step 3: Wait for recoil window to expire (0.50s > 0.45s)
-        time.sleep(0.50)
-
-        # Step 4: Flick DOWN (knuckles move downwards towards y=1.0, ny increases)
-        for lm_idx in [5, 9, 13, 17]:
-            landmarks[lm_idx]["ny"] += 0.040
-        mode, info = self.detector.detect(landmarks, fist_fingers)
-        self.assertEqual(mode, GestureMode.SCROLLING)
-        self.assertLess(info["scroll_delta"], 0, "Flicking DOWN must produce negative scroll delta (Scroll DOWN)")
-        self.assertEqual(info["scroll_direction"], "DOWN")
-
-        # Step 5: Sensor noise within deadzone (< 0.003) produces zero scroll
-        for lm_idx in [5, 9, 13, 17]:
-            landmarks[lm_idx]["ny"] += 0.001
-        mode, info = self.detector.detect(landmarks, fist_fingers)
-        self.assertEqual(mode, GestureMode.SCROLLING)
-        self.assertEqual(info["scroll_delta"], 0)
-
-    def test_fist_scroll_recoil_return_stroke_is_suppressed(self):
-        landmarks = self._mock_landmarks()
-        fist_fingers = {"thumb": False, "index": False, "middle": False, "ring": False, "pinky": False}
-
-        # Initial anchor
-        self.detector.detect(landmarks, fist_fingers)
-
-        # 1. Action 1: User flicks UP
-        for lm_idx in [5, 9, 13, 17]:
-            landmarks[lm_idx]["ny"] -= 0.030
-        mode, info_up = self.detector.detect(landmarks, fist_fingers)
-        self.assertGreater(info_up["scroll_delta"], 0, "Initial flick up must trigger scroll up")
-
-        # 2. Hand recoils / returns back down to original position immediately (0.05s later)
-        time.sleep(0.05)
-        for lm_idx in [5, 9, 13, 17]:
-            landmarks[lm_idx]["ny"] += 0.030
-        mode, info_recoil = self.detector.detect(landmarks, fist_fingers)
-
-        # CRITICAL USER REQUIREMENT: Return stroke must NOT trigger scroll down! Exactly 1 action!
-        self.assertEqual(info_recoil["scroll_delta"], 0,
-                         "Opposite return stroke during recoil window MUST be suppressed (0 scroll delta)")
-
-
     def test_pinch_click(self):
         # Very close thumb and index (< 0.05)
         landmarks = self._mock_landmarks(thumb_pos=(0.50, 0.50), index_pos=(0.52, 0.50))
@@ -203,6 +144,58 @@ class TestGestureDetector(unittest.TestCase):
         # With palm_scale 0.25: effective threshold = 0.075 (dist 0.05 IS a pinch)
         mode, info = detector_scale.detect(landmarks, fingers, palm_scale=0.25)
         self.assertEqual(mode, GestureMode.CLICK)
+
+    def test_v_sign_hold_to_toggle_head_scroll(self):
+        landmarks = self._mock_landmarks()
+        # Front palm: Index MCP(5) nx=0.55, Pinky MCP(17) nx=0.45, Handedness="Right"
+        landmarks[5]["nx"] = 0.55
+        landmarks[17]["nx"] = 0.45
+        # V-sign: Index and Middle extended, Ring and Pinky curled down
+        v_fingers = {"thumb": False, "index": True, "middle": True, "ring": False, "pinky": False}
+
+        # Step 1: Initial detection of V-sign
+        mode, info = self.detector.detect(landmarks, v_fingers, handedness="Right")
+        self.assertTrue(info["is_v_sign"])
+        self.assertFalse(info["v_sign_toggled"], "Must not toggle on the first frame")
+        self.assertEqual(mode, GestureMode.IDLE, "Cursor must stay IDLE during V-sign hold to prevent drift")
+        self.assertLess(info["v_sign_progress"], 1.0)
+
+        # Step 2: Hold continuously for 0.25s (> v_sign_hold_sec=0.2)
+        time.sleep(0.25)
+        mode, info = self.detector.detect(landmarks, v_fingers, handedness="Right")
+        self.assertTrue(info["v_sign_toggled"], "Holding V-sign for full duration must trigger toggle")
+        self.assertEqual(info["v_sign_progress"], 1.0)
+        self.assertEqual(info["v_sign_remaining"], 0.0)
+
+        # Step 3: Sustained hold on next frame -> latched, does NOT re-trigger!
+        mode, info = self.detector.detect(landmarks, v_fingers, handedness="Right")
+        self.assertFalse(info["v_sign_toggled"], "Subsequent frames while still holding V-sign must be latched")
+        self.assertTrue(info["is_v_sign"])
+
+        # Step 4: Drop / curl middle finger back to normal pointing (index only)
+        pointing_fingers = {"thumb": False, "index": True, "middle": False, "ring": False, "pinky": False}
+        mode, info = self.detector.detect(landmarks, pointing_fingers, handedness="Right")
+        self.assertFalse(info["is_v_sign"])
+        self.assertFalse(self.detector.v_sign_latched)
+        self.assertEqual(self.detector.v_sign_start_time, 0.0)
+        self.assertEqual(mode, GestureMode.MOVING)
+
+    def test_v_sign_early_release_cancels_timer(self):
+        landmarks = self._mock_landmarks()
+        landmarks[5]["nx"] = 0.55
+        landmarks[17]["nx"] = 0.45
+        v_fingers = {"thumb": False, "index": True, "middle": True, "ring": False, "pinky": False}
+
+        # Start V-sign hold
+        self.detector.detect(landmarks, v_fingers, handedness="Right")
+        self.assertGreater(self.detector.v_sign_start_time, 0.0)
+
+        # Release immediately before timer completes
+        pointing_fingers = {"thumb": False, "index": True, "middle": False, "ring": False, "pinky": False}
+        mode, info = self.detector.detect(landmarks, pointing_fingers, handedness="Right")
+        self.assertFalse(info["is_v_sign"])
+        self.assertFalse(info["v_sign_toggled"])
+        self.assertEqual(self.detector.v_sign_start_time, 0.0)
 
 
 class TestHandTrackerRotation(unittest.TestCase):

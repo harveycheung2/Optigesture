@@ -1,0 +1,1 @@
+Introducing OptiGesture: turn any standard laptop webcam into a zero-latency spatial air mouse with zero-drift pinch clicks and magnetic button snapping. Built 100% offline with zero cloud and zero wearables. github.com/harveycheung2/Optigesture

@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #101014;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #F5F5FA;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at center, #181822 0%, #0d0d12 100%);
+      }
+      /* Subtle cybernetic grid */
+      .grid-overlay {
+        position: absolute;
+        inset: 0;
+        background-size: 60px 60px;
+        background-image: 
+          linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        pointer-events: none;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Scene 1: Hook */
+      .hook-title {
+        font-size: 64px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        text-align: center;
+        max-width: 1200px;
+        line-height: 1.2;
+        text-transform: uppercase;
+      }
+      .hook-highlight {
+        color: #00E6FF;
+        text-shadow: 0 0 35px rgba(0, 230, 255, 0.4);
+      }
+      .reticle-box {
+        position: absolute;
+        width: 1300px;
+        height: 280px;
+        border: 2px solid rgba(0, 230, 255, 0.35);
+        border-radius: 12px;
+        pointer-events: none;
+      }
+
+      /* Scene 2: Brand Reveal */
+      .brand-title {
+        font-size: 110px;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        color: #FFFFFF;
+        text-shadow: 0 4px 40px rgba(0, 230, 255, 0.3);
+      }
+      .brand-subtitle {
+        font-size: 36px;
+        font-weight: 500;
+        color: #00E6FF;
+        margin-top: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .badges-row {
+        display: flex;
+        gap: 24px;
+        margin-top: 50px;
+      }
+      .badge-pill {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(0, 230, 255, 0.4);
+        border-radius: 9999px;
+        padding: 14px 32px;
+        font-size: 22px;
+        font-weight: 600;
+        color: #E2E8F0;
+        backdrop-filter: blur(8px);
+      }
+
+      /* Scene 3: Features */
+      .feature-container {
+        display: flex;
+        gap: 36px;
+        align-items: center;
+      }
+      .feature-card {
+        width: 480px;
+        height: 380px;
+        background: rgba(20, 20, 28, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 36px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+      }
+      .card-tag {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+      .card-tag.cyan { color: #00E6FF; }
+      .card-tag.emerald { color: #3CDC50; }
+      .card-tag.gold { color: #FFD200; }
+      .card-title {
+        font-size: 34px;
+        font-weight: 700;
+        line-height: 1.25;
+        margin-top: 12px;
+      }
+      .card-desc {
+        font-size: 20px;
+        color: #94A3B8;
+        line-height: 1.5;
+        margin-top: 12px;
+      }
+      .card-footer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .card-metric {
+        font-size: 18px;
+        font-weight: 600;
+        color: #F1F5F9;
+      }
+
+      /* Scene 4: Outro */
+      .outro-tagline {
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        color: #94A3B8;
+        text-transform: uppercase;
+        margin-bottom: 16px;
+      }
+      .outro-brand {
+        font-size: 120px;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        background: linear-gradient(135deg, #FFFFFF 30%, #00E6FF 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .outro-link {
+        margin-top: 36px;
+        font-size: 28px;
+        font-weight: 600;
+        color: #00E6FF;
+        background: rgba(0, 230, 255, 0.08);
+        border: 1px solid rgba(0, 230, 255, 0.35);
+        border-radius: 12px;
+        padding: 16px 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="18"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div class="grid-overlay"></div>
+
+      <!-- Audio Track -->
+      <audio
+        id="bg-music"
+        data-start="0"
+        data-duration="18"
+        data-track-index="10"
+        data-volume="0.32"
+        src="assets/music/track.mp3"
+      ></audio>
+
+      <!-- Scene 1: The Hook -->
+      <div id="scene-hook" class="clip scene" data-start="0" data-duration="3.5">
+        <div class="reticle-box" id="reticle"></div>
+        <h1 class="hook-title" id="hook-text">
+          What if you never touched <br />
+          <span class="hook-highlight">a mouse again?</span>
+        </h1>
+      </div>
+
+      <!-- Scene 2: Brand Reveal -->
+      <div id="scene-brand" class="clip scene" data-start="3.5" data-duration="4.0">
+        <h1 class="brand-title" id="brand-title">OptiGesture</h1>
+        <p class="brand-subtitle" id="brand-sub">Spatial Air Mouse for Windows</p>
+        <div class="badges-row" id="badges-row">
+          <div class="badge-pill">21-Point Skeletal AI</div>
+          <div class="badge-pill">1€ Filter Anti-Jitter</div>
+          <div class="badge-pill">100% Offline Edge Vision</div>
+        </div>
+      </div>
+
+      <!-- Scene 3: Three Action Highlights -->
+      <div id="scene-features" class="clip scene" data-start="7.5" data-duration="6.0">
+        <div class="feature-container" id="cards-container">
+          <div class="feature-card" id="card-1">
+            <div>
+              <span class="card-tag emerald">Zero-Drift Click</span>
+              <h2 class="card-title">Instant Pinch Anchor</h2>
+              <p class="card-desc">Coordinates lock the millisecond fingers touch. Zero click slip.</p>
+            </div>
+            <div class="card-footer">
+              <span class="card-metric">Pinch to Click | Hold to Drag</span>
+            </div>
+          </div>
+
+          <div class="feature-card" id="card-2">
+            <div>
+              <span class="card-tag cyan">Smart Assist</span>
+              <h2 class="card-title">Magnetic Snap</h2>
+              <p class="card-desc">Windows UI Automation magnetically attracts cursor to nearby buttons.</p>
+            </div>
+            <div class="card-footer">
+              <span class="card-metric">Cyan Tab-Style Focus Ring</span>
+            </div>
+          </div>
+
+          <div class="feature-card" id="card-3">
+            <div>
+              <span class="card-tag gold">Kinematic Control</span>
+              <h2 class="card-title">Head Nod Scroll</h2>
+              <p class="card-desc">Nod head down or tilt up to scroll with return-to-neutral recoil suppression.</p>
+            </div>
+            <div class="card-footer">
+              <span class="card-metric">Zero Counter-Scroll Rebound</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 4: Outro -->
+      <div id="scene-outro" class="clip scene" data-start="13.5" data-duration="4.5">
+        <p class="outro-tagline" id="outro-tag">The Mousepad Is Dead</p>
+        <h1 class="outro-brand" id="outro-brand">OptiGesture</h1>
+        <div class="outro-link" id="outro-link">github.com/harveycheung2/Optigesture</div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // Scene 1: Hook (0s - 3.5s)
+      tl.set("#scene-hook", { opacity: 1, pointerEvents: "auto" }, 0);
+      tl.fromTo("#hook-text", { opacity: 0, scale: 0.92, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0.2);
+      tl.fromTo("#reticle", { opacity: 0, scale: 1.1 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.5)" }, 0.4);
+      tl.to("#scene-hook", { opacity: 0, scale: 1.05, duration: 0.4, ease: "power2.in" }, 3.1);
+
+      // Scene 2: Brand Reveal (3.5s - 7.5s)
+      tl.set("#scene-brand", { opacity: 1, pointerEvents: "auto" }, 3.5);
+      tl.fromTo("#brand-title", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 3.6);
+      tl.fromTo("#brand-sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 3.9);
+      tl.fromTo(".badge-pill", { opacity: 0, y: 30 }, { opacity: 1, y: 0, stagger: 0.15, duration: 0.5, ease: "power2.out" }, 4.3);
+      tl.to("#scene-brand", { opacity: 0, y: -30, duration: 0.4, ease: "power2.in" }, 7.1);
+
+      // Scene 3: Features (7.5s - 13.5s)
+      tl.set("#scene-features", { opacity: 1, pointerEvents: "auto" }, 7.5);
+      tl.fromTo(".feature-card", { opacity: 0, y: 50, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, stagger: 0.2, duration: 0.7, ease: "power3.out" }, 7.7);
+      tl.to("#scene-features", { opacity: 0, scale: 0.96, duration: 0.4, ease: "power2.in" }, 13.1);
+
+      // Scene 4: Outro (13.5s - 18.0s)
+      tl.set("#scene-outro", { opacity: 1, pointerEvents: "auto" }, 13.5);
+      tl.fromTo("#outro-tag", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 13.7);
+      tl.fromTo("#outro-brand", { opacity: 0, scale: 0.88 }, { opacity: 1, scale: 1, duration: 0.8, ease: "power3.out" }, 14.0);
+      tl.fromTo("#outro-link", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 14.5);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

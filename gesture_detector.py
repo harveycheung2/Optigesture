@@ -9,7 +9,6 @@ class GestureMode(Enum):
     MOVING = "MOVING"         # Pointer tracking active (index finger pointing)
     CLICK = "CLICK"           # Quick pinch left-click (zero-drift anchor)
     DRAGGING = "DRAGGING"     # Held pinch click & drag
-    SCROLLING = "SCROLLING"   # Fist scroll (knuckles to screen: flick up/down)
     PAUSED = "PAUSED"         # Paused (only unpaused by keyboard button)
 
 
@@ -18,8 +17,8 @@ class GestureDetector:
     Focused, high-precision gesture detector:
     - Index pointing for fluid cursor tracking
     - Zero-drift pinch left click & hold-to-drag
-    - Fist with knuckles facing screen for vertical scrolling (flick up/down)
     - Back-of-hand 5-second continuous hold to pause (unpause exclusively via keyboard button)
+    - V-sign (peace sign) 1.5-second continuous hold to toggle head nod scroll
     """
     def __init__(
         self,
@@ -33,11 +32,8 @@ class GestureDetector:
         palm_pinch_click_ratio: float = 0.28,
         palm_pinch_release_ratio: float = 0.40,
         anchor_on_pinch: bool = True,
-        fist_scroll_steps: int = 4,
-        fist_scroll_flick_threshold: float = 0.011,
-        fist_scroll_recoil_window_sec: float = 0.45,
-        fist_scroll_cooldown_sec: float = 0.22,
-        fist_scroll_deadzone: float = 0.003,
+        v_sign_hold_sec: float = 1.5,
+        open_palm_hold_sec: Optional[float] = None,
         **kwargs,
     ):
         self.pinch_click_threshold = pinch_click_threshold
@@ -51,16 +47,13 @@ class GestureDetector:
         self.palm_pinch_release_ratio = palm_pinch_release_ratio
         self.anchor_on_pinch = anchor_on_pinch
 
-        # Fist Scrolling parameters & Recoil State Machine
-        self.fist_scroll_steps = fist_scroll_steps
-        self.fist_scroll_flick_threshold = fist_scroll_flick_threshold
-        self.fist_scroll_recoil_window_sec = fist_scroll_recoil_window_sec
-        self.fist_scroll_cooldown_sec = fist_scroll_cooldown_sec
-        self.fist_scroll_deadzone = fist_scroll_deadzone
-
-        self.prev_knuckle_y: Optional[float] = None
-        self.last_flick_dir: Optional[str] = None
-        self.last_flick_time: float = 0.0
+        # V-Sign Hold to Toggle Head Scroll parameters
+        self.v_sign_hold_sec = v_sign_hold_sec if open_palm_hold_sec is None else open_palm_hold_sec
+        self.open_palm_hold_sec = self.v_sign_hold_sec  # Alias for backward compatibility
+        self.v_sign_start_time = 0.0
+        self.open_palm_start_time = 0.0
+        self.v_sign_latched = False
+        self.open_palm_latched = False
 
         self.current_mode = GestureMode.IDLE
         self.is_pinching = False
@@ -80,9 +73,10 @@ class GestureDetector:
         else:
             self.current_mode = GestureMode.IDLE
             self.back_start_time = 0.0
-            self.prev_knuckle_y = None
-            self.last_flick_dir = None
-            self.last_flick_time = 0.0
+            self.v_sign_start_time = 0.0
+            self.v_sign_latched = False
+            self.open_palm_start_time = 0.0
+            self.open_palm_latched = False
         return self.manual_paused
 
     def detect(
@@ -121,18 +115,25 @@ class GestureDetector:
             "back_duration": 0.0,
             "back_remaining": self.back_hold_sec,
             "back_toggled": False,
-            "is_fist": False,
-            "scroll_delta": 0,
-            "scroll_direction": "NONE",
-            "fist_delta_y": 0.0,
+            "is_v_sign": False,
+            "v_sign_progress": 0.0,
+            "v_sign_duration": 0.0,
+            "v_sign_remaining": self.v_sign_hold_sec,
+            "v_sign_toggled": False,
+            "is_open_palm": False,
+            "open_palm_progress": 0.0,
+            "open_palm_duration": 0.0,
+            "open_palm_remaining": self.v_sign_hold_sec,
+            "open_palm_toggled": False,
         }
 
         if not landmarks or len(landmarks) < 21:
             self._reset_pinch()
             self.back_start_time = 0.0
-            self.prev_knuckle_y = None
-            self.last_flick_dir = None
-            self.last_flick_time = 0.0
+            self.v_sign_start_time = 0.0
+            self.v_sign_latched = False
+            self.open_palm_start_time = 0.0
+            self.open_palm_latched = False
             if self.manual_paused:
                 return GestureMode.PAUSED, info
             self.current_mode = GestureMode.IDLE
@@ -141,9 +142,10 @@ class GestureDetector:
         # If manually paused, stay paused until user presses keyboard button
         if self.manual_paused:
             self._reset_pinch()
-            self.prev_knuckle_y = None
-            self.last_flick_dir = None
-            self.last_flick_time = 0.0
+            self.v_sign_start_time = 0.0
+            self.v_sign_latched = False
+            self.open_palm_start_time = 0.0
+            self.open_palm_latched = False
             return GestureMode.PAUSED, info
 
         # Compute Palm Orientation (signed 2D cross product of wrist->index and wrist->pinky)
@@ -159,91 +161,17 @@ class GestureDetector:
         palm_score = cross_2d * h_sign
         info["palm_score"] = palm_score
 
-        # Check for fist (all four non-thumb fingers curled down)
-        is_fist = not any(finger_states.get(f, False) for f in ["index", "middle", "ring", "pinky"])
-
         # -------------------------------------------------------------------
-        # 1. FIST SCROLLING (Knuckles to screen: Flick Up = Scroll Up, Flick Down = Scroll Down)
-        # -------------------------------------------------------------------
-        if is_fist:
-            self._reset_pinch()
-            self.back_start_time = 0.0  # Reset back-of-hand timer when in fist
-            info["is_fist"] = True
-
-            # Track 4-knuckle centroid (MCP landmarks 5, 9, 13, 17) for robust vertical motion
-            knuckle_y = (landmarks[5]["ny"] + landmarks[9]["ny"] + landmarks[13]["ny"] + landmarks[17]["ny"]) / 4.0
-            knuckle_x = (landmarks[5]["nx"] + landmarks[9]["nx"] + landmarks[13]["nx"] + landmarks[17]["nx"]) / 4.0
-            info["pointer_pos"] = (knuckle_x, knuckle_y)
-
-            scroll_delta = 0
-
-            if self.prev_knuckle_y is not None:
-                delta_y = knuckle_y - self.prev_knuckle_y
-                info["fist_delta_y"] = delta_y
-                time_since_flick = now - self.last_flick_time
-
-                # Check for explosive flick impulse
-                # ny decreases when moving UP (delta_y < 0) -> scroll UP (positive delta)
-                # ny increases when moving DOWN (delta_y > 0) -> scroll DOWN (negative delta)
-                if abs(delta_y) >= self.fist_scroll_flick_threshold:
-                    flick_candidate = "UP" if delta_y < 0 else "DOWN"
-
-                    # RECOIL SUPPRESSION:
-                    # When returning to original neutral position after a flick, the hand naturally moves
-                    # in the opposite direction. If an opposite flick occurred recently (< recoil_window),
-                    # this return motion is strictly SUPPRESSED so only 1 action triggers!
-                    if self.last_flick_dir is not None and time_since_flick < self.fist_scroll_recoil_window_sec:
-                        if flick_candidate != self.last_flick_dir:
-                            # Suppress return stroke completely!
-                            pass
-                        else:
-                            # Same direction: allow consecutive flick if debounce cooldown has passed
-                            if time_since_flick >= self.fist_scroll_cooldown_sec:
-                                impulse_mult = max(1.0, abs(delta_y) / self.fist_scroll_flick_threshold)
-                                steps = int(round(self.fist_scroll_steps * impulse_mult))
-                                scroll_delta = steps if flick_candidate == "UP" else -steps
-                                self.last_flick_dir = flick_candidate
-                                self.last_flick_time = now
-                    else:
-                        # Decisive flick from neutral resting position!
-                        impulse_mult = max(1.0, abs(delta_y) / self.fist_scroll_flick_threshold)
-                        steps = int(round(self.fist_scroll_steps * impulse_mult))
-                        scroll_delta = steps if flick_candidate == "UP" else -steps
-                        self.last_flick_dir = flick_candidate
-                        self.last_flick_time = now
-                else:
-                    # Gradual motion or resting: check if recoil window has elapsed
-                    if time_since_flick >= self.fist_scroll_recoil_window_sec:
-                        if abs(delta_y) < self.fist_scroll_deadzone:
-                            self.last_flick_dir = None
-
-                # For HUD display: sustain visual direction confirmation
-                if scroll_delta != 0:
-                    info["scroll_direction"] = "UP" if scroll_delta > 0 else "DOWN"
-                elif self.last_flick_dir is not None and (now - self.last_flick_time) < 0.40:
-                    info["scroll_direction"] = self.last_flick_dir
-                else:
-                    info["scroll_direction"] = "NONE"
-
-            self.prev_knuckle_y = knuckle_y
-            info["scroll_delta"] = scroll_delta
-
-            self.current_mode = GestureMode.SCROLLING
-            return GestureMode.SCROLLING, info
-
-        else:
-            # Hand is not a fist: reset fist scroll tracking
-            self.prev_knuckle_y = None
-            self.last_flick_dir = None
-            self.last_flick_time = 0.0
-
-        # -------------------------------------------------------------------
-        # 2. BACK-OF-HAND 5-SECOND CONTINUOUS HOLD TO PAUSE
+        # 1. BACK-OF-HAND 5-SECOND CONTINUOUS HOLD TO PAUSE
         # -------------------------------------------------------------------
         is_back = (palm_score < -self.palm_orientation_deadzone)
 
         if is_back:
             self._reset_pinch()
+            self.v_sign_start_time = 0.0
+            self.v_sign_latched = False
+            self.open_palm_start_time = 0.0
+            self.open_palm_latched = False
             info["is_back_of_hand"] = True
 
             if self.back_start_time == 0.0:
@@ -270,6 +198,61 @@ class GestureDetector:
         else:
             # Not showing back of hand: reset 5s timer
             self.back_start_time = 0.0
+
+        # -------------------------------------------------------------------
+        # 2. V-SIGN 1.5-SECOND CONTINUOUS HOLD TO TOGGLE HEAD SCROLL
+        # -------------------------------------------------------------------
+        # V-sign / Peace sign: Index & Middle extended, Ring & Pinky curled down, palm facing forward
+        index_extended = finger_states.get("index", False)
+        middle_extended = finger_states.get("middle", False)
+        ring_curled = not finger_states.get("ring", False)
+        pinky_curled = not finger_states.get("pinky", False)
+        facing_forward = (palm_score > self.palm_orientation_deadzone)
+        is_v_sign = facing_forward and index_extended and middle_extended and ring_curled and pinky_curled
+
+        if is_v_sign:
+            self._reset_pinch()
+            info["is_v_sign"] = True
+            info["is_open_palm"] = True
+
+            if not self.v_sign_latched:
+                if self.v_sign_start_time == 0.0:
+                    self.v_sign_start_time = now
+                    self.open_palm_start_time = now
+
+                v_duration = now - self.v_sign_start_time
+                info["v_sign_duration"] = v_duration
+                info["v_sign_progress"] = min(1.0, v_duration / self.v_sign_hold_sec)
+                info["v_sign_remaining"] = max(0.0, self.v_sign_hold_sec - v_duration)
+                info["open_palm_duration"] = v_duration
+                info["open_palm_progress"] = info["v_sign_progress"]
+                info["open_palm_remaining"] = info["v_sign_remaining"]
+
+                if v_duration >= self.v_sign_hold_sec:
+                    self.v_sign_latched = True
+                    self.open_palm_latched = True
+                    info["v_sign_toggled"] = True
+                    info["open_palm_toggled"] = True
+                    info["v_sign_progress"] = 1.0
+                    info["v_sign_remaining"] = 0.0
+                    info["open_palm_progress"] = 1.0
+                    info["open_palm_remaining"] = 0.0
+            else:
+                info["v_sign_progress"] = 1.0
+                info["v_sign_remaining"] = 0.0
+                info["open_palm_progress"] = 1.0
+                info["open_palm_remaining"] = 0.0
+
+            # While holding V-sign, freeze cursor to avoid jumping
+            self.current_mode = GestureMode.IDLE
+            return GestureMode.IDLE, info
+
+        else:
+            # Not showing V-sign: reset 1.5s timer and unlatch
+            self.v_sign_start_time = 0.0
+            self.v_sign_latched = False
+            self.open_palm_start_time = 0.0
+            self.open_palm_latched = False
 
         # -------------------------------------------------------------------
         # 3. PINCH CLICK & HOLD-TO-DRAG (Index & Thumb)

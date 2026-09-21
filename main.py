@@ -11,6 +11,7 @@ from mouse_controller import WindowsMouseController
 from hud import HUDOverlay
 from calibration import GestureCalibrator, CalibrationStep
 from smart_target import SmartTargetAssistant
+from head_tracker import HeadTracker
 
 
 def map_coordinate(val: float, margin_low: float, margin_high: float, target_max: int) -> float:
@@ -90,11 +91,7 @@ def run():
         palm_pinch_click_ratio=getattr(config, "PALM_PINCH_CLICK_RATIO", 0.28),
         palm_pinch_release_ratio=getattr(config, "PALM_PINCH_RELEASE_RATIO", 0.40),
         anchor_on_pinch=getattr(config, "ANCHOR_ON_PINCH", True),
-        fist_scroll_steps=getattr(config, "FIST_SCROLL_STEPS", 4),
-        fist_scroll_flick_threshold=getattr(config, "FIST_SCROLL_FLICK_THRESHOLD", 0.011),
-        fist_scroll_recoil_window_sec=getattr(config, "FIST_SCROLL_RECOIL_WINDOW_SEC", 0.45),
-        fist_scroll_cooldown_sec=getattr(config, "FIST_SCROLL_COOLDOWN_SEC", 0.22),
-        fist_scroll_deadzone=getattr(config, "FIST_SCROLL_DEADZONE", 0.003),
+        v_sign_hold_sec=getattr(config, "V_SIGN_TOGGLE_SEC", getattr(config, "OPEN_PALM_TOGGLE_SEC", 1.5)),
     )
 
     curr_margin_x = config.MARGIN_X
@@ -114,6 +111,18 @@ def run():
         snap_strength=getattr(config, "SNAP_STRENGTH", 0.55),
         enable_snap=getattr(config, "ENABLE_SMART_SNAP", True),
         enable_overlay=getattr(config, "SHOW_DESKTOP_FOCUS_RING", True),
+        spring_damping=getattr(config, "SPRING_SNAP_DAMPING", 1.0),
+        spring_response=getattr(config, "SPRING_SNAP_RESPONSE", 0.35),
+    )
+
+    # Initialize Head Tracker for Head Nod Scrolling
+    head_scroll_enabled = getattr(config, "ENABLE_HEAD_SCROLL", True)
+    head_tracker = HeadTracker(
+        pitch_threshold=getattr(config, "HEAD_SCROLL_PITCH_THRESHOLD", 8.5),
+        return_deadzone=getattr(config, "HEAD_SCROLL_RETURN_DEADZONE", 3.5),
+        recoil_window_sec=getattr(config, "HEAD_SCROLL_RECOIL_WINDOW_SEC", 0.60),
+        cooldown_sec=getattr(config, "HEAD_SCROLL_COOLDOWN_SEC", 0.35),
+        scroll_steps=getattr(config, "HEAD_SCROLL_STEPS", 4),
     )
 
     # Initialize Gesture Calibrator
@@ -137,10 +146,12 @@ def run():
     print("  * Move Cursor : Point index finger inside active interaction zone")
     print("  * Left Click  : Pinch Thumb & Index (Zero-drift locked anchor)")
     print("  * Drag & Drop : Pinch and hold for > 0.35s, then move hand")
-    print("  * Fist Scroll : Form fist with knuckles to screen (Flick UP = Scroll UP, Flick DOWN = Scroll DOWN)")
+    print("  * Head Scroll : Nod head down & return = Scroll DOWN | Tilt up & return = Scroll UP")
     print("  * Tab Focus   : Nearby buttons/tabs are highlighted & magnetically snapped")
     print("  * Pause       : Hold Back of Hand continuously for 5.0s (or press [P])")
     print("  * Resume      : Press [P] or [Space] on keyboard (Button ONLY)")
+    print("  * [N] Key     : Toggle Head Nod Scroll on/off (or hold V-Sign for 1.5s)")
+    print("  * [C] Key     : Calibrate / center head neutral pitch")
     print("  * [K] Key     : Run interactive 2-step calibration wizard")
     print("  * [T] Key     : Toggle Tab-style magnetic snapping on/off")
     print("  * [ / ] Keys  : Adjust active reach zone margins on the fly")
@@ -179,6 +190,15 @@ def run():
             finger_states = tracker.get_finger_states(landmarks) if landmarks else {}
             palm_scale = tracker.get_palm_scale(landmarks) if landmarks else 0.15
 
+            # MediaPipe head tracking for Head Nod Scrolling
+            head_info = None
+            if head_scroll_enabled or getattr(config, "SHOW_HEAD_LANDMARKS", True):
+                face_landmarks, matrix = head_tracker.process_frame(frame, timestamp_ms=timestamp_ms)
+                if face_landmarks:
+                    head_info = head_tracker.update(face_landmarks, matrix, curr_time=curr_time)
+                    if getattr(config, "SHOW_HEAD_LANDMARKS", True):
+                        head_tracker.draw_head_pose(frame, face_landmarks, head_info)
+
             # If Calibration is active, run wizard instead of moving mouse
             if calibrator.is_active:
                 c_step, prog, msg = calibrator.update(landmarks, finger_states, palm_scale)
@@ -198,6 +218,10 @@ def run():
                 if key == 32:  # Space
                     calibrator.cancel()
                     print("[Calibration] Skipped by user.")
+                elif key == ord('n') or key == ord('N'):
+                    calibrator.cancel()
+                    head_scroll_enabled = not head_scroll_enabled
+                    print(f"[Calibration] Skipped. Head Scroll {'ENABLED' if head_scroll_enabled else 'DISABLED'}")
                 elif key == 27 or key == ord('q'):
                     print("\nExiting...")
                     break
@@ -236,8 +260,15 @@ def run():
                         else:
                             smooth_x, smooth_y = filter_engine.filter(target_screen_x, target_screen_y)
 
-                    # Apply Tab-style Smart Magnetic Snapping
-                    snapped_x, snapped_y, focused_target = smart_assistant.apply_magnetic_snap(smooth_x, smooth_y)
+                    # Apply Apple-Grade Spring Magnetic Snapping
+                    snapped_x, snapped_y, focused_target = smart_assistant.apply_magnetic_snap(smooth_x, smooth_y, curr_time=curr_time)
+                    if focused_target and focused_target.get("just_snapped") and audio_enabled:
+                        import threading
+                        try:
+                            import winsound
+                            threading.Thread(target=lambda: winsound.Beep(1800, 20), daemon=True).start()
+                        except Exception:
+                            pass
                     mouse.move_to(snapped_x, snapped_y)
                     current_screen_x, current_screen_y = int(snapped_x), int(snapped_y)
 
@@ -262,11 +293,11 @@ def run():
             elif mode != GestureMode.DRAGGING and mouse.is_left_down:
                 mouse.left_up()
 
-            # Process Fist Scrolling
-            if mode == GestureMode.SCROLLING:
-                scroll_delta = info.get("scroll_delta", 0)
-                if scroll_delta != 0:
-                    mouse.scroll(scroll_delta)
+            # Process Scrolling (Head Nod)
+            if mode != GestureMode.PAUSED and head_scroll_enabled and head_info:
+                head_scroll = head_info.get("scroll_delta", 0)
+                if head_scroll != 0:
+                    mouse.scroll(head_scroll)
 
             # Process Back-of-Hand Pause Toggle
             if info.get("back_toggled"):
@@ -276,6 +307,25 @@ def run():
                     try:
                         import winsound
                         threading.Thread(target=lambda: winsound.Beep(600, 160), daemon=True).start()
+                    except Exception:
+                        pass
+
+            # Process V-Sign 1.5s Hold (Toggle Head Scroll Feature)
+            if info.get("v_sign_toggled") or info.get("open_palm_toggled"):
+                head_scroll_enabled = not head_scroll_enabled
+                mode_desc = "Head Scroll ENABLED" if head_scroll_enabled else "Head Scroll DISABLED"
+                print(f"\n[Scroll Mode] V-Sign held 1.5s -> {mode_desc}")
+                hud.set_alert(f"HEAD SCROLL: {'ON' if head_scroll_enabled else 'OFF'}")
+                if audio_enabled:
+                    import threading
+                    try:
+                        import winsound
+                        tone1 = 800 if head_scroll_enabled else 1200
+                        tone2 = 1200 if head_scroll_enabled else 800
+                        def _play_toggle_chime(t1, t2):
+                            winsound.Beep(t1, 90)
+                            winsound.Beep(t2, 130)
+                        threading.Thread(target=_play_toggle_chime, args=(tone1, tone2), daemon=True).start()
                     except Exception:
                         pass
 
@@ -291,6 +341,8 @@ def run():
                 screen_coords=(current_screen_x, current_screen_y),
                 screen_res=(screen_w, screen_h),
                 focused_target=focused_target,
+                head_scroll_enabled=head_scroll_enabled,
+                head_info=head_info,
             )
 
             # Show window
@@ -301,6 +353,12 @@ def run():
             if key == ord('q') or key == 27:  # 'q' or Esc
                 print("\nExiting...")
                 break
+            elif key == ord('n') or key == ord('N'):
+                head_scroll_enabled = not head_scroll_enabled
+                print(f"\n[Scroll Mode] Head Scroll {'ENABLED' if head_scroll_enabled else 'DISABLED'}")
+                hud.set_alert(f"HEAD SCROLL: {'ON' if head_scroll_enabled else 'OFF'}")
+            elif key == ord('c') or key == ord('C'):
+                head_tracker.calibrate_neutral()
             elif key == ord('p') or key == ord('P') or key == 32:  # 'P' or Space
                 is_paused = detector.toggle_pause()
                 print(f"\n[Status] Keyboard button pressed -> Program {'PAUSED' if is_paused else 'RESUMED'}")
@@ -318,8 +376,6 @@ def run():
             elif key == ord('t') or key == ord('T'):
                 snap_on = smart_assistant.toggle_snap()
                 print(f"[Smart Snap] Magnetic button snapping {'ENABLED' if snap_on else 'DISABLED'}")
-            elif key == ord('c') or key == ord('C'):
-                hud.toggle_details()
             elif key == ord('a') or key == ord('A'):
                 audio_enabled = not audio_enabled
                 print(f"[Audio] Click sound feedback {'ENABLED' if audio_enabled else 'DISABLED'}")

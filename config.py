@@ -61,13 +61,6 @@ CLICK_COOLDOWN_SEC = 0.25           # Delay between single clicks to avoid accid
 BACK_OF_HAND_PAUSE_SEC = 5.0         # Must hold back of hand continuously for 5 seconds to pause
 PALM_ORIENTATION_DEADZONE = 0.003   # Deadzone around edge-on orientation to prevent false triggers
 
-# Fist Scrolling (Knuckles to screen: Flick Up = Scroll Up, Flick Down = Scroll Down)
-FIST_SCROLL_STEPS = 4                # Number of scroll wheel steps per flick impulse
-FIST_SCROLL_FLICK_THRESHOLD = 0.011  # Normalized knuckle displacement to trigger a flick
-FIST_SCROLL_RECOIL_WINDOW_SEC = 0.45 # Cooldown window to suppress opposite-direction return motion
-FIST_SCROLL_COOLDOWN_SEC = 0.22      # Minimum debounce between consecutive flicks in same direction
-FIST_SCROLL_DEADZONE = 0.003        # Motion deadzone to ignore camera landmark noise
-
 # Interactive Calibration Wizard
 AUTO_CALIBRATE_ON_START = True      # Run 2-step calibration wizard on startup (press Space to skip)
 
@@ -77,4 +70,21 @@ SNAP_RADIUS_PX = 45.0               # Distance in screen pixels to trigger magne
 SNAP_STRENGTH = 0.55                # Strength of magnetic attraction (0.0 - 1.0)
 SHOW_DESKTOP_FOCUS_RING = True      # Display glowing Tab-style focus frame directly over Windows buttons
 
+# Head Nod Scrolling (Nod head down & return = Scroll Down, Look up & return = Scroll Up)
+ENABLE_HEAD_SCROLL = True               # Enable head nod scroll tracking by default
+HEAD_SCROLL_PITCH_THRESHOLD = 8.5       # Degrees of tilt up/down to arm nod gesture
+HEAD_SCROLL_RETURN_DEADZONE = 3.5       # Degrees to register return to neutral position
+HEAD_SCROLL_RECOIL_WINDOW_SEC = 0.60    # Window to suppress opposite-direction recoil rebound
+HEAD_SCROLL_COOLDOWN_SEC = 0.35         # Minimum debounce between consecutive same-direction nods
+HEAD_SCROLL_STEPS = 4                   # Number of scroll wheel steps per nod
+SHOW_HEAD_LANDMARKS = True              # Render head orientation reticle on camera preview
+# V-Sign Gesture (1.5-Second Timer to Toggle Head Scroll)
+V_SIGN_TOGGLE_SEC = 1.5              # Must hold V-sign (peace sign) continuously for 1.5 seconds to toggle head scroll
+OPEN_PALM_TOGGLE_SEC = 1.5           # Fallback alias for backward compatibility
+
+# Apple Fluid Spring Snapping & Rubber-Banding
+SPRING_SNAP_DAMPING = 1.0            # Critically damped (1.0 = smooth settle, zero overshoot)
+SPRING_SNAP_RESPONSE = 0.35          # Spring settle response in seconds
+ENABLE_RUBBERBANDING = True          # Progressive elastic resistance at interaction box edges
+RUBBERBAND_CONSTANT = 0.55           # Apple exponential resistance coefficient
 

@@ -4,6 +4,8 @@ import threading
 from typing import Dict, Optional, Tuple
 import ctypes
 
+from springs import Spring2D
+
 try:
     import uiautomation as auto
     HAS_UIAUTOMATION = True
@@ -16,7 +18,7 @@ class SmartTargetAssistant:
     Discovers nearby interactive buttons, tabs, links, and controls on Windows.
     Provides:
     1. Tab-Style Focus Ring Highlighting (visual frame around active control).
-    2. Magnetic Snapping (soft assistive pull towards button center when within reach).
+    2. Apple-Grade Spring Magnetic Snapping (critically damped smooth pull towards button center).
     Runs asynchronously in a background thread to prevent any camera / tracking lag.
     """
 
@@ -32,11 +34,19 @@ class SmartTargetAssistant:
         snap_strength: float = 0.55,
         enable_snap: bool = True,
         enable_overlay: bool = True,
+        spring_damping: float = 1.0,
+        spring_response: float = 0.35,
     ):
         self.snap_radius = snap_radius
         self.snap_strength = snap_strength
         self.enable_snap = enable_snap
         self.enable_overlay = enable_overlay
+
+        # Apple Fluid Spring for magnetic cursor settling
+        self.spring = Spring2D(damping_ratio=spring_damping, response=spring_response)
+        self.is_snapped = False
+        self.last_snap_time = time.time()
+        self.active_target_id = None
 
         self.last_query_time = 0.0
         self.query_interval = 0.06  # ~16 Hz check rate for UI elements
@@ -133,32 +143,75 @@ class SmartTargetAssistant:
         with self.lock:
             self.latest_cursor_pos = (screen_x, screen_y)
 
-    def apply_magnetic_snap(self, screen_x: float, screen_y: float) -> Tuple[float, float, Optional[Dict]]:
+    def apply_magnetic_snap(
+        self,
+        screen_x: float,
+        screen_y: float,
+        curr_time: Optional[float] = None,
+    ) -> Tuple[float, float, Optional[Dict]]:
         """
-        Applies magnetic attraction towards the center of a nearby button/control.
+        Applies Apple-grade critically damped spring attraction towards the center of a nearby button/control.
         Returns: (snapped_x, snapped_y, target_info_dict)
         """
+        now = curr_time if curr_time is not None else time.time()
+        dt = max(0.001, min(0.10, now - self.last_snap_time))
+        self.last_snap_time = now
+
         self.update_cursor_position(int(screen_x), int(screen_y))
 
         if not self.enable_snap:
+            self.is_snapped = False
+            self.active_target_id = None
             return screen_x, screen_y, None
 
         with self.lock:
             target = self.current_target
 
         if not target:
+            if self.is_snapped:
+                self.spring.set_target(screen_x, screen_y)
+                snapped_x, snapped_y = self.spring.update(dt)
+                if math.hypot(snapped_x - screen_x, snapped_y - screen_y) < 2.0:
+                    self.is_snapped = False
+                    self.active_target_id = None
+                    return screen_x, screen_y, None
+                return snapped_x, snapped_y, None
             return screen_x, screen_y, None
 
         center_x, center_y = target["center"]
         dist = target["distance"]
 
         if dist <= self.snap_radius:
-            # Magnetic attraction factor: stronger near the center, smoothly fading at radius boundary
             proximity_factor = 1.0 - (dist / self.snap_radius)
-            pull = self.snap_strength * proximity_factor
+            # Quadratic tactile pull: soft entry at boundary, firm pull near button center
+            pull = self.snap_strength * (proximity_factor ** 1.3)
+            goal_x = screen_x + (center_x - screen_x) * pull
+            goal_y = screen_y + (center_y - screen_y) * pull
 
-            snapped_x = screen_x + (center_x - screen_x) * pull
-            snapped_y = screen_y + (center_y - screen_y) * pull
+            target_id = (target.get("name"), center_x, center_y)
+            just_snapped = False
+            if not self.is_snapped or self.active_target_id != target_id:
+                just_snapped = True
+                self.is_snapped = True
+                self.active_target_id = target_id
+                self.spring.reset(screen_x, screen_y)
+
+            self.spring.set_target(goal_x, goal_y)
+            snapped_x, snapped_y = self.spring.update(dt)
+
+            target_copy = dict(target)
+            target_copy["just_snapped"] = just_snapped
+            target_copy["proximity"] = proximity_factor
+            return snapped_x, snapped_y, target_copy
+
+        if self.is_snapped:
+            # Smooth spring release when cursor pulls away
+            self.spring.set_target(screen_x, screen_y)
+            snapped_x, snapped_y = self.spring.update(dt)
+            if math.hypot(snapped_x - screen_x, snapped_y - screen_y) < 2.0:
+                self.is_snapped = False
+                self.active_target_id = None
+                return screen_x, screen_y, target
             return snapped_x, snapped_y, target
 
         return screen_x, screen_y, target
